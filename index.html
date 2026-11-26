@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mujina Miner — Object Model</title>
+<style>
+:root{
+  --bg:#f8fafc;--surface:#ffffff;--surface-alt:#f1f5f9;--border:#e2e8f0;--border-strong:#cbd5e1;
+  --text:#0f172a;--muted:#475569;--subtle:#64748b;--accent:#f7931a;--accent-soft:#fff7ed;--accent-border:#fed7aa;
+  --code-bg:#0f172a;--code-fg:#e2e8f0;
+  --role-surface:#2563eb;--role-task:#7c3aed;--role-contract:#0d9488;--role-state:#059669;
+  --role-driver:#d97706;--role-infra:#db2777;--role-hw:#dc2626;
+  --shadow:0 1px 2px rgba(15,23,42,.05),0 1px 3px rgba(15,23,42,.04);
+  --radius:10px;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg:#0b1120;--surface:#111827;--surface-alt:#1e293b;--border:#1f2937;--border-strong:#334155;
+  --text:#f1f5f9;--muted:#cbd5e1;--subtle:#94a3b8;--accent:#f7931a;--accent-soft:#2a1d0f;--accent-border:#7c2d12;
+  --code-bg:#020617;--code-fg:#e2e8f0;
+  --role-surface:#60a5fa;--role-task:#a78bfa;--role-contract:#2dd4bf;--role-state:#34d399;
+  --role-driver:#fbbf24;--role-infra:#f472b6;--role-hw:#f87171;
+  --shadow:0 1px 3px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased}
+a{color:var(--role-surface);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font:12.8px/1.45 var(--mono);background:var(--surface-alt);border:1px solid var(--border);padding:1px 5px;border-radius:5px}
+pre{margin:0;background:var(--code-bg);color:var(--code-fg);padding:16px 18px;border-radius:var(--radius);overflow:auto;font:12.5px/1.55 var(--mono)}
+pre code{background:none;border:none;padding:0;color:inherit;font-size:inherit}
+
+/* Layout */
+.shell{display:grid;grid-template-columns:258px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;padding:22px 16px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:16px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-dot{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;flex:none}
+.brand-title{font-weight:700;font-size:14.5px;line-height:1.25}
+.brand-sub{font-size:12px;color:var(--subtle)}
+
+/* Project Switcher */
+.proj-switch{display:grid;grid-template-columns:1fr;gap:5px;padding:6px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px}
+.proj-btn{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);font:600 13px var(--font);text-align:left;transition:all .12s}
+.proj-btn:hover{background:var(--surface);color:var(--text)}
+.proj-btn.active{background:var(--surface);color:var(--text);border-color:var(--accent);box-shadow:var(--shadow)}
+.proj-btn .tag{font:600 10.5px var(--mono);color:var(--subtle);background:var(--surface-alt);border:1px solid var(--border);padding:1px 6px;border-radius:999px}
+.proj-btn.active .tag{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-border)}
+
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav-group{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--subtle);margin:12px 8px 4px}
+.nav a{padding:6px 10px;border-radius:7px;color:var(--muted);font-size:13.3px;font-weight:500;display:block}
+.nav a:hover{background:var(--surface-alt);color:var(--text);text-decoration:none}
+.nav a.active{background:var(--accent-soft);color:var(--text);font-weight:600;border-left:3px solid var(--accent);padding-left:7px}
+.sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;font-size:11.8px;color:var(--subtle)}
+.theme-btn{cursor:pointer;background:var(--surface-alt);color:var(--text);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;font:600 12.5px var(--font);text-align:left}
+.theme-btn:hover{border-color:var(--accent)}
+
+.main{padding:36px clamp(20px,4vw,56px) 84px;max-width:1220px;width:100%}
+.project-view{display:none}
+.project-view.active{display:block}
+
+header.hero{padding-bottom:26px;border-bottom:1px solid var(--border);margin-bottom:34px}
+.eyebrow-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border);padding:3px 10px;border-radius:999px}
+.commit-pill{font:600 11.5px var(--mono);color:var(--subtle);background:var(--surface);border:1px solid var(--border-strong);padding:3px 9px;border-radius:999px}
+h1{margin:0 0 10px;font-size:clamp(26px,3.2vw,34px);line-height:1.18;letter-spacing:-.02em}
+.lead{margin:0;max-width:84ch;color:var(--muted);font-size:15.8px}
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:20px}
+.pillar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;box-shadow:var(--shadow)}
+.pillar strong{display:block;font-size:13.5px;margin-bottom:3px}
+.pillar span{font-size:12.5px;color:var(--muted)}
+
+section{margin-top:48px;scroll-margin-top:24px}
+h2{margin:0 0 8px;font-size:22px;letter-spacing:-.015em;display:flex;align-items:center;gap:10px}
+h2 .num{font:700 12px var(--mono);color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border);padding:2px 7px;border-radius:6px}
+h3{margin:24px 0 8px;font-size:16px}
+.section-desc{margin:0 0 18px;color:var(--muted);max-width:84ch}
+
+/* Role badges */
+.badge{display:inline-flex;align-items:center;gap:5px;font:600 11.5px var(--font);padding:2px 8px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.b-surface{color:var(--role-surface);background:color-mix(in srgb,var(--role-surface) 11%,transparent);border-color:color-mix(in srgb,var(--role-surface) 28%,transparent)}
+.b-task{color:var(--role-task);background:color-mix(in srgb,var(--role-task) 11%,transparent);border-color:color-mix(in srgb,var(--role-task) 28%,transparent)}
+.b-contract{color:var(--role-contract);background:color-mix(in srgb,var(--role-contract) 11%,transparent);border-color:color-mix(in srgb,var(--role-contract) 28%,transparent)}
+.b-state{color:var(--role-state);background:color-mix(in srgb,var(--role-state) 11%,transparent);border-color:color-mix(in srgb,var(--role-state) 28%,transparent)}
+.b-driver{color:var(--role-driver);background:color-mix(in srgb,var(--role-driver) 11%,transparent);border-color:color-mix(in srgb,var(--role-driver) 28%,transparent)}
+.b-infra{color:var(--role-infra);background:color-mix(in srgb,var(--role-infra) 11%,transparent);border-color:color-mix(in srgb,var(--role-infra) 28%,transparent)}
+.b-hw{color:var(--role-hw);background:color-mix(in srgb,var(--role-hw) 11%,transparent);border-color:color-mix(in srgb,var(--role-hw) 28%,transparent)}
+.scope-pill{font:600 11px var(--mono);color:var(--subtle);background:var(--surface-alt);border:1px solid var(--border);padding:1px 7px;border-radius:5px;text-transform:uppercase;white-space:nowrap}
+
+/* Cards & Grids */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.rule-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.rule-card h4{margin:0 0 6px;font-size:14px}
+.rule-card p{margin:0;font-size:13.2px;color:var(--muted)}
+
+/* Tables */
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:13.4px}
+th{text-align:left;padding:10px 14px;background:var(--surface-alt);color:var(--subtle);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:color-mix(in srgb,var(--surface-alt) 60%,transparent)}
+
+/* Nested Ownership Diagram */
+.own-root{background:var(--surface);border:2px solid var(--border-strong);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.own-hdr{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.own-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px;flex-wrap:wrap}
+.own-meta{font-size:12px;color:var(--subtle)}
+.own-order{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font:600 11.5px var(--mono);color:var(--subtle);background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:6px 12px;margin-bottom:14px}
+.own-stack{display:flex;flex-direction:column;gap:12px}
+.own-box{border:1px solid var(--border-strong);border-left:4px solid var(--border-strong);border-radius:9px;padding:13px 15px;background:color-mix(in srgb,var(--surface-alt) 42%,var(--surface))}
+.own-box.hw{border-left-color:var(--role-hw)}
+.own-box.infra{border-left-color:var(--role-infra)}
+.own-box.state{border-left-color:var(--role-state)}
+.own-box.surface{border-left-color:var(--role-surface)}
+.own-box.task{border-left-color:var(--role-task)}
+.own-box.driver{border-left-color:var(--role-driver)}
+.own-box.contract{border-left-color:var(--role-contract)}
+.own-subgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:10px;margin-top:10px}
+.own-leaf{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px 11px;font-size:12.8px}
+.own-leaf strong{display:block;font-size:13px;margin-bottom:2px}
+.own-leaf span{color:var(--muted)}
+
+/* Tabs & Mermaid Panels */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.tab{cursor:pointer;background:var(--surface);color:var(--muted);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;font:600 12.8px var(--font);transition:all .12s}
+.tab:hover{color:var(--text);border-color:var(--accent)}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.panel{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.panel.active{display:block}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.panel-head h3{margin:0;font-size:16px}
+.panel-head p{margin:0;font-size:13px;color:var(--muted)}
+.diagram-box{overflow-x:auto;padding:10px 4px;min-height:150px}
+.diagram-box svg{max-width:100%;height:auto;display:block;margin:0 auto}
+.panel-notes{margin:14px 0 0;padding:12px 16px;background:var(--surface-alt);border-radius:8px;font-size:13px;color:var(--muted)}
+.panel-notes ul{margin:6px 0 0;padding-left:18px}
+.panel-notes li{margin:4px 0}
+
+/* Catalog Filter Bar */
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.search-input{flex:1 1 240px;padding:8px 12px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:13.5px var(--font)}
+.search-input:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,transparent);border-color:var(--accent)}
+.select-input{padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:13px var(--font)}
+.count-pill{font:600 12px var(--mono);color:var(--subtle);margin-left:auto}
+
+.callout{background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--radius);padding:13px 16px;font-size:13.5px;margin-top:16px}
+.callout strong{color:var(--text)}
+
+@media(max-width:960px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);padding:16px}
+  .proj-switch{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .nav-group,.sidebar-foot{display:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-dot">₿</div>
+      <div>
+        <div class="brand-title">Mujina Object Model</div>
+        <div class="brand-sub">Rust Mining Daemon Architecture</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="sideNav">
+      <div class="nav-group">Model</div>
+      <a href="#muj-roles">1. Roles &amp; Dependency Rules</a>
+      <a href="#muj-ownership">2. Ownership &amp; OS Boundary</a>
+      <a href="#muj-execution">3. Channel &amp; Trait Contracts</a>
+      <div class="nav-group">Daemon Areas (7 Views)</div>
+      <a href="#muj-features">4. Subsystem Relationships</a>
+      <a href="#muj-sequences">5. Hotplug &amp; Shutdown Flows</a>
+      <div class="nav-group">Reference</div>
+      <a href="#muj-catalog">6. Complete Type Directory</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <button class="theme-btn" id="themeToggle" type="button">Switch to Dark Theme</button>
+      <div>Async Rust / Tokio architecture up to USB, serial &amp; TCP boundaries (<code>e960d20</code>).</div>
+      <div>Sibling model: <a href="https://johnny9.dev/esp-miner-object-model/">ESP-Miner Object Model</a></div>
+    </div>
+  </aside>
+
+  <main class="main">
+<header class="hero">
+        <div class="eyebrow-row">
+          <span class="eyebrow">Architecture Reference · Async Rust / Tokio Daemon</span>
+          <span class="commit-pill">256foundation/mujina · main @ e960d20</span>
+        </div>
+        <h1>Mujina Miner Object Model</h1>
+        <p class="lead">
+          Complete runtime architecture of upstream <code>mujina-miner</code>—covering the <code>Daemon</code> composition root, <code>Backplane</code> hotplug router, <code>Scheduler</code> hub, <code>HashThread</code> actor boundary, <code>hw_trait</code> peripheral stack, Stratum v1 job source, and <code>axum</code> v0 REST/OpenAPI surface.
+        </p>
+        <div class="pillars">
+          <div class="pillar"><strong>Channel-Decoupled Subsystems</strong><span><code>Backplane</code>, <code>Scheduler</code>, <code>JobSource</code>s, and <code>API</code> never call each other directly—all edges are typed <code>mpsc</code>, <code>watch</code>, or <code>oneshot</code> channels.</span></div>
+          <div class="pillar"><strong>Trait-Driven Hardware Seams</strong><span><code>HashThread</code> unifies single-chip Bitaxe, 12-chip EmberOne, and CPU miners; <code>hw_trait::*</code> lets peripheral drivers run over RHAP-D, Linux buses, or mocks.</span></div>
+          <div class="pillar"><strong>Inventory Plugin Hotplug</strong><span>Boards self-register via <code>inventory::submit!</code>; <code>Backplane</code> scores USB patterns by specificity and scopes teardown per <code>DeviceKey</code>.</span></div>
+          <div class="pillar"><strong>Three-Layer Share Filtering</strong><span>Chip <code>TicketMask</code> → per-thread <code>HashTask.share_target</code> (1–10 shares/s) → pool <code>JobTemplate.share_target</code>; structured <code>CancellationToken</code> + <code>TaskTracker</code> exit.</span></div>
+        </div>
+      </header>
+
+      <!-- MUJINA 01 -->
+      <section id="muj-roles">
+        <h2><span class="num">01</span> Roles, Scopes &amp; Dependency Rules</h2>
+        <p class="section-desc">
+          <strong>Role</strong> defines what each type or actor owns. <strong>Scope</strong> (<code>daemon</code>, <code>board</code>, <code>thread</code>, <code>source</code>, <code>task</code>) defines its lifetime and teardown channel.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Role</th><th>Responsibility</th><th>Module / Naming Pattern</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge b-surface">Client / API</span></td>
+                <td>External REST/OpenAPI HTTP surface and CLI/TUI clients reading telemetry watches and dispatching typed commands.</td>
+                <td><code>api/*</code>, <code>api_client/*</code>, <code>bin/{cli,tui}.rs</code></td>
+                <td><code>api::serve</code>, <code>v0::routes</code>, <code>SharedState</code>, <code>api::BoardRegistry</code>, <code>SwaggerUi</code>, <code>mujina-cli</code>, <code>mujina-tui</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-task">Coordinator</span></td>
+                <td>Top-level async event loops owning registries, <code>SlotMap</code>/<code>StreamMap</code> multiplexers, and lifecycle orchestration.</td>
+                <td><code>daemon.rs</code>, <code>backplane.rs</code>, <code>scheduler.rs</code></td>
+                <td><code>Daemon</code>, <code>Backplane</code>, <code>Scheduler</code>, <code>StartupGate</code>, <code>ActiveBoard</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-contract">Trait / Contract</span></td>
+                <td>Abstract seams decoupling subsystems and enabling deterministic unit tests without hardware or sockets.</td>
+                <td><code>HashThread</code>, <code>hw_trait::*</code>, <code>Connector</code>, <code>BackplaneConnector</code></td>
+                <td><code>HashThread</code>, <code>hw_trait::{I2c, Gpio, Adc, RgbLed}</code>, <code>ChipCommandSink</code>, <code>stratum_v1::Connector</code>, <code>stratum_v1::Transport</code>, <code>BackplaneConnector</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-state">Actor / Source</span></td>
+                <td>Autonomous async tasks or OS worker threads executing hashing, board monitoring, or pool sessions.</td>
+                <td><code>*Thread</code>, <code>*Source</code>, <code>*Client</code></td>
+                <td><code>BM13xxThread</code> (+ <code>Actor</code> + <code>Reader</code>), <code>CpuHashThread</code>, <code>StratumV1Source</code>, <code>StratumV1Client</code>, <code>ForcedRateSource</code>, <code>DummySource</code>, <code>BitaxeMonitor</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-driver">Driver / Codec</span></td>
+                <td>Board factories, ASIC wire codecs/chain topology, management MCU protocol, and chip-agnostic I2C peripheral drivers.</td>
+                <td><code>board/*</code>, <code>asic/bm13xx/*</code>, <code>mgmt_protocol/*</code>, <code>peripheral/*</code></td>
+                <td><code>board::bitaxe</code>, <code>board::emberone00</code>, <code>board::cpu</code>, <code>Chain</code>, <code>TopologySpec</code>, <code>RegisterClient</code>, <code>ControlChannel</code> (<code>bitaxe_raw</code>), <code>Tps546</code>, <code>Emc2101</code>, <code>Tmp1075</code>, <code>Tmp451</code>, <code>StatusLed</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-infra">Channel / Msg</span></td>
+                <td>Typed message envelopes and reactive snapshots carrying work, shares, registrations, telemetry, and commands across boundaries.</td>
+                <td><code>*Event</code>, <code>*Command</code>, <code>*Registration</code>, <code>*Telemetry</code></td>
+                <td><code>TransportEvent</code>, <code>ThreadRegistration</code>, <code>SourceRegistration</code>, <code>SourceEvent</code>/<code>SourceCommand</code>, <code>HashTask</code>/<code>Share</code>, <code>SchedulerCommand</code>, <code>BoardRegistration</code>, <code>MinerTelemetry</code>/<code>BoardTelemetry</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge b-hw">Transport / OS</span></td>
+                <td>Raw OS device discovery, serial byte streams, TCP sockets, and POSIX signal hooks. Knows nothing about mining protocols.</td>
+                <td><code>transport/*</code>, <code>TcpConnector</code>, <code>tokio::signal</code></td>
+                <td><code>UsbTransport</code>, <code>SerialStream</code>/<code>SerialReader</code>/<code>SerialWriter</code>, <code>TcpConnector</code>, <code>Device</code>/<code>DeviceKey</code>, <code>SIGINT</code>/<code>SIGTERM</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Three Approved Dependency Paths</h3>
+        <div class="grid-3">
+          <div class="rule-card">
+            <h4>1. Mining Work &amp; Share Loop</h4>
+            <p><code>JobSource</code> → <code>mpsc&lt;SourceEvent&gt;</code> → <code>Scheduler</code> → <code>Box&lt;dyn HashThread&gt;</code> (<code>HashTask</code> with per-task <code>share_tx</code>) → <code>ShareStream</code> → <code>SourceCommand::SubmitShare</code>.</p>
+          </div>
+          <div class="rule-card">
+            <h4>2. Board, Peripherals &amp; ASIC Stack</h4>
+            <p><code>Backplane</code> invokes <code>inventory</code> <code>BoardDescriptor</code> factory → <code>ControlChannel</code> (<code>bitaxe_raw</code> / RHAP-D) provides <code>hw_trait</code> adapters to reusable <code>Peripheral</code> drivers; ASICs speak raw serial bytes directly inside <code>BM13xxThread</code>.</p>
+          </div>
+          <div class="rule-card">
+            <h4>3. Pull-Free Telemetry &amp; Per-Target Commands</h4>
+            <p><code>Scheduler</code> publishes <code>watch&lt;MinerTelemetry&gt;</code>; each board publishes <code>watch&lt;BoardTelemetry&gt;</code>; <code>api::serve</code> merges them on request and sends commands over target-specific <code>mpsc</code> channels with <code>oneshot</code> replies.</p>
+          </div>
+        </div>
+
+        <h3>Single Owner for Each Kind of State</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>State</th><th>Single Authority</th><th>Lifetime &amp; Ownership Rule</th></tr></thead>
+            <tbody>
+              <tr><td>Process tasks &amp; cancellation tree</td><td><span class="badge b-task">Coordinator</span> <code>Daemon</code> <span class="scope-pill">daemon</span></td><td>Owns root <code>CancellationToken</code> and <code>TaskTracker</code>; calls <code>shutdown.cancel()</code> then <code>tracker.wait().await</code> on <code>SIGINT</code>/<code>SIGTERM</code>.</td></tr>
+              <tr><td>Connected boards &amp; shutdown futures</td><td><span class="badge b-task">Coordinator</span> <code>Backplane</code> <span class="scope-pill">board</span></td><td>Maps <code>DeviceKey → ActiveBoard</code>; awaits old board's <code>shutdown: BoxFuture</code> on unplug, same-key replacement, or daemon exit.</td></tr>
+              <tr><td>Sources, threads, active tasks &amp; share routing</td><td><span class="badge b-task">Coordinator</span> <code>Scheduler</code> <span class="scope-pill">daemon</span></td><td>Owns <code>SlotMap</code>s for <code>sources</code>, <code>threads</code>, <code>tasks</code> and local <code>StreamMap</code>s; per-task <code>mpsc::Sender&lt;Share&gt;</code> implicitly routes shares back to the originating source.</td></tr>
+              <tr><td>ASIC serial bus, chip chain &amp; nonce decoding</td><td><span class="badge b-state">Actor</span> <code>BM13xxThread::Actor</code> + <code>Reader</code> <span class="scope-pill">thread</span></td><td>Owns <code>Chain</code>, <code>ChipCommandSink</code>, <code>BoardPeripherals</code>, and active/previous <code>HashTask</code>; lazily brings up silicon on first job.</td></tr>
+              <tr><td>Pool TCP connection, reconnect backoff &amp; diff suggestion</td><td><span class="badge b-state">Actor</span> <code>StratumV1Source</code> → <code>StratumV1Client</code> <span class="scope-pill">source</span></td><td>Owns <code>ExponentialBackoff</code>, <code>MAX_JOB_GAP (120 s)</code> liveness watchdog, and <code>suggest_difficulty</code> deadband/cooldown state.</td></tr>
+              <tr><td>Board telemetry snapshots in API</td><td><span class="badge b-surface">API</span> <code>api::BoardRegistry</code> <span class="scope-pill">daemon</span></td><td>Holds <code>Vec&lt;BoardRegistration&gt;</code> behind <code>Arc&lt;Mutex&lt;_&gt;&gt;</code>; lazily prunes disconnected boards when <code>telemetry_rx.has_changed().is_err()</code>.</td></tr>
+              <tr><td>MCU management link (I2C/GPIO/LED)</td><td><span class="badge b-driver">Driver</span> <code>ControlChannel</code> <span class="scope-pill">board</span></td><td>Cloneable async handle multiplexing <code>bitaxe_raw</code> V0/V1 request-response frames over the board's control serial port.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- MUJINA 02 -->
+      <section id="muj-ownership">
+        <h2><span class="num">02</span> Ownership Tree, Async Tasks &amp; Hardware Boundary</h2>
+        <p class="section-desc">
+          <code>Daemon::run()</code> constructs every inter-subsystem channel upfront, spawns independent Tokio tasks into a <code>TaskTracker</code>, and relies on channel closure and <code>CancellationToken</code> propagation for clean reverse-order unwinding.
+        </p>
+
+        <div class="own-root">
+          <div class="own-hdr">
+            <div class="own-title"><span class="badge b-task">Composition Root</span> <code>minerd::main()</code> → <code>Daemon::run()</code> <span class="scope-pill">daemon root</span></div>
+            <div class="own-meta"><code>mujina-miner/src/daemon.rs</code> · owns root <code>CancellationToken</code> + <code>TaskTracker</code></div>
+          </div>
+          <div class="own-order">
+            <span>↓ WIRING &amp; SPAWN ORDER (TOP TO BOTTOM)</span>
+            <span>↑ SHUTDOWN ORDER: SIGINT/SIGTERM → shutdown.cancel() → tracker.wait().await</span>
+          </div>
+
+          <div class="own-stack">
+            <div class="own-box hw">
+              <div class="own-hdr" style="margin-bottom:4px">
+                <div class="own-title"><span class="badge b-hw">Transports &amp; Discovery</span> USB Hotplug + Virtual CPU Transport</div>
+                <div class="own-meta">One <code>mpsc::Receiver&lt;TransportEvent&gt;</code> per transport · emits <code>InitialEnumerationComplete</code></div>
+              </div>
+              <div class="own-subgrid">
+                <div class="own-leaf"><strong><code>UsbTransport</code></strong><span>Discovers USB devices, emits <code>Connected(Device::Usb)</code> / <code>Disconnected(DeviceKey::Usb)</code> (disabled via <code>MUJINA_USB_DISABLE</code>)</span></div>
+                <div class="own-leaf"><strong>CPU Virtual Transport</strong><span>Injected when <code>CpuMinerConfig::from_env()</code> is set; sends one <code>Device::Cpu</code> + <code>InitialEnumerationComplete</code> then drops sender</span></div>
+              </div>
+            </div>
+
+            <div class="own-box task">
+              <div class="own-hdr" style="margin-bottom:4px">
+                <div class="own-title"><span class="badge b-task">Backplane</span> <code>Backplane::run(shutdown)</code> <span class="scope-pill">daemon</span></div>
+                <div class="own-meta">Multiplexes transport streams via <code>StreamMap</code> · owns <code>HashMap&lt;DeviceKey, ActiveBoard&gt;</code></div>
+              </div>
+              <div class="own-subgrid">
+                <div class="own-leaf"><strong><code>BoardRegistry</code> &amp; <code>VirtualBoardRegistry</code></strong><span>Iterates compile-time <code>inventory::submit!</code> descriptors; picks highest-specificity <code>BoardPattern</code></span></div>
+                <div class="own-leaf"><strong><code>Bitaxe Gamma</code> (<code>board/bitaxe.rs</code>)</strong><span><code>ControlChannel</code> (<code>bitaxe-raw</code> V0 / <code>RHAP-D</code> V1) → <code>Emc2101</code>, <code>Tps546Regulator</code>, <code>BitaxeMonitor</code> task, 1× <code>BM13xxThread</code></span></div>
+                <div class="own-leaf"><strong><code>emberOne/00</code> (<code>board/emberone00.rs</code>)</strong><span><code>ControlChannel</code> → <code>BitaxeRawGpio</code>, <code>Tmp1075</code>, <code>Tmp451</code>, <code>StatusLed</code> (SK6812), telemetry task, 12-chip chain</span></div>
+                <div class="own-leaf"><strong><code>CPU Miner</code> (<code>board/cpu.rs</code>)</strong><span>Virtual board spawning N× <code>CpuHashThread</code> (OS worker threads running software SHA-256 with duty cycling)</span></div>
+              </div>
+            </div>
+
+            <div class="own-box state">
+              <div class="own-hdr" style="margin-bottom:4px">
+                <div class="own-title"><span class="badge b-state">Job Sources</span> Stratum v1, Forced-Rate Wrapper &amp; Dummy Source <span class="scope-pill">source</span></div>
+                <div class="own-meta">Registered via <code>mpsc&lt;SourceRegistration&gt;</code> (<code>event_rx</code> + <code>command_tx</code>)</div>
+              </div>
+              <div class="own-subgrid">
+                <div class="own-leaf"><strong><code>StratumV1Source</code></strong><span>Supervisor loop: <code>ExponentialBackoff</code> (1–60 s jittered), <code>MAX_JOB_GAP</code> (2 min), <code>suggest_difficulty</code> deadband/cooldown</span></div>
+                <div class="own-leaf"><strong><code>StratumV1Client</code> + <code>Connection</code></strong><span>Line-delimited JSON-RPC over <code>Connector</code> (<code>TcpConnector</code>); handles interleaved setup notifications</span></div>
+                <div class="own-leaf"><strong><code>ForcedRateSource</code> / <code>DummySource</code></strong><span>Optional test decorator capping/forcing share rate, or offline synthetic 30 s job generator when <code>MUJINA_POOL_URL</code> is unset</span></div>
+              </div>
+            </div>
+
+            <div class="own-box task">
+              <div class="own-hdr" style="margin-bottom:4px">
+                <div class="own-title"><span class="badge b-task">Mining Core</span> <code>scheduler::task()</code> → <code>Scheduler</code> <span class="scope-pill">daemon</span></div>
+                <div class="own-meta">Central <code>tokio::select!</code> loop · knows nothing about USB, boards, or HTTP</div>
+              </div>
+              <div class="own-subgrid">
+                <div class="own-leaf"><strong><code>SlotMap</code> Registries</strong><span><code>sources: SlotMap&lt;SourceId, SourceEntry&gt;</code>, <code>threads: SlotMap&lt;ThreadId, ThreadEntry&gt;</code>, <code>tasks: SlotMap&lt;TaskId, TaskEntry&gt;</code></span></div>
+                <div class="own-leaf"><strong><code>StreamMap</code> Multiplexers</strong><span><code>SourceEventStream</code>, <code>ThreadEventStream</code>, and <code>ShareStream</code> (per-task <code>mpsc::Receiver&lt;Share&gt;</code>)</span></div>
+                <div class="own-leaf"><strong>Policy &amp; Estimators</strong><span><code>StartupGate</code> (10 s fallback timeout), <code>HashrateEstimator</code> (5 min window), <code>DebouncedAlarm</code>, target clamping (1–10 shares/s)</span></div>
+              </div>
+            </div>
+
+            <div class="own-box surface">
+              <div class="own-hdr" style="margin-bottom:4px">
+                <div class="own-title"><span class="badge b-surface">HTTP API &amp; External Clients</span> <code>api::serve()</code> (Axum) + <code>mujina-cli</code> / <code>mujina-tui</code></div>
+                <div class="own-meta">Default bind <code>127.0.0.1:7785</code> (warns if non-loopback) · <code>/api/v0</code> + <code>/swagger-ui</code></div>
+              </div>
+              <div class="own-subgrid">
+                <div class="own-leaf"><strong><code>SharedState</code> &amp; <code>api::BoardRegistry</code></strong><span>Combines <code>watch::Receiver&lt;MinerTelemetry&gt;</code> with background-drained <code>watch::Receiver&lt;BoardTelemetry&gt;</code> list</span></div>
+                <div class="own-leaf"><strong><code>v0::routes()</code></strong><span><code>GET /health</code>, <code>GET/PATCH /miner</code>, <code>GET /boards[/{name}]</code>, <code>GET /sources[/{name}]</code>, <code>/api/v0/openapi.json</code></span></div>
+                <div class="own-leaf"><strong>Client Binaries</strong><span><code>mujina-cli</code> (<code>status</code>, raw <code>api</code> calls via <code>api_client</code>) and <code>mujina-tui</code> (Ratatui placeholder)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3>OS &amp; Hardware Boundary Summary</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>External Boundary</th><th>Mujina Owner</th><th>Abstraction Seam</th><th>Lifecycle / Disconnect Policy</th></tr></thead>
+            <tbody>
+              <tr><td>USB hotplug (udev / sysfs)</td><td><code>UsbTransport</code></td><td><code>TransportEvent::{Connected, Disconnected, InitialEnumerationComplete}</code></td><td>Reports stable <code>DeviceKey::Usb(DevicePath)</code>; unrelated USB removals are ignored by <code>Backplane</code>.</td></tr>
+              <tr><td>Board Control Serial Port</td><td><code>ControlChannel</code> (<code>mgmt_protocol/bitaxe_raw</code>)</td><td><code>hw_trait::{I2c, Gpio, RgbLed}</code></td><td>Tunnels I2C/GPIO/LED frames (V0 or V1 status byte) for peripheral drivers; torn down via board <code>shutdown</code> future.</td></tr>
+              <tr><td>ASIC Data Serial Port</td><td><code>BM13xxThread::Actor</code> &amp; <code>Reader</code></td><td><code>FramedRead</code> / <code>ChipCommandSink</code> + <code>HashThread</code> trait</td><td>Serial errors close <code>HashThreadEvent</code> channel; <code>Scheduler</code> detects closure and removes thread automatically.</td></tr>
+              <tr><td>Pool TCP Socket</td><td><code>stratum_v1::Connection</code></td><td><code>Connector</code> / <code>Transport</code> traits (<code>TcpConnector</code> in prod)</td><td>Disconnects drop client; <code>StratumV1Source</code> emits <code>ClearJobs</code> and reconnects with jittered exponential backoff.</td></tr>
+              <tr><td>HTTP Listener (<code>TcpListener</code>)</td><td><code>api::serve</code> (<code>axum</code>)</td><td><code>SharedState</code> + <code>SchedulerCommand</code> (<code>oneshot</code> reply)</td><td><code>axum::serve(...).with_graceful_shutdown(shutdown.cancelled())</code> drains in-flight HTTP requests on exit.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- MUJINA 03 -->
+      <section id="muj-execution">
+        <h2><span class="num">03</span> Execution, Channel &amp; Trait Contracts</h2>
+        <p class="section-desc">
+          Mujina replaces shared mutable globals with Rust ownership, actor tasks, and explicit async trait/channel boundaries.
+        </p>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="margin-top:0">Core Rust Contracts (<code>hash_thread.rs</code>, <code>board/mod.rs</code>, <code>messages.rs</code>)</h3>
+            <pre><code>#[async_trait]
+pub trait HashThread: Send {
+    fn name(&amp;self) -&gt; &amp;str;
+    fn capabilities(&amp;self) -&gt; &amp;HashThreadCapabilities;
+    async fn configure(&amp;mut self) -&gt; Result&lt;()&gt;;                 // emits ExpectedHashRate
+    async fn update_task(&amp;mut self, t: HashTask) -&gt; Result&lt;Option&lt;HashTask&gt;&gt;;  // old valid
+    async fn replace_task(&amp;mut self, t: HashTask) -&gt; Result&lt;Option&lt;HashTask&gt;&gt;; // hard wipe
+    async fn go_idle(&amp;mut self) -&gt; Result&lt;Option&lt;HashTask&gt;&gt;;
+    fn take_event_receiver(&amp;mut self) -&gt; Option&lt;mpsc::Receiver&lt;HashThreadEvent&gt;&gt;;
+    fn status(&amp;self) -&gt; HashThreadStatus;
+}
+
+pub struct BackplaneConnector {
+    pub info: BoardInfo,
+    pub threads: Vec&lt;Box&lt;dyn HashThread&gt;&gt;,
+    pub telemetry_rx: watch::Receiver&lt;BoardTelemetry&gt;,
+    pub shutdown: Option&lt;BoxFuture&lt;'static, ()&gt;&gt;,
+}
+
+pub enum SourceEvent   { UpdateJob(JobTemplate), ReplaceJob(JobTemplate), ClearJobs }
+pub enum SourceCommand { SubmitShare(Share), UpdateHashRate(HashRate) }
+pub enum SchedulerCommand {
+    PauseMining  { reply: oneshot::Sender&lt;Result&lt;()&gt;&gt; },
+    ResumeMining { reply: oneshot::Sender&lt;Result&lt;()&gt;&gt; },
+}</code></pre>
+          </div>
+
+          <div class="card">
+            <h3 style="margin-top:0">Key Runtime Invariants (Verified at <code>e960d20</code>)</h3>
+            <ul style="margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13.4px">
+              <li style="margin-bottom:8px"><strong>Implicit share routing by channel ownership:</strong> Each <code>HashTask</code> carries a fresh per-task <code>mpsc::Sender&lt;Share&gt;</code> whose receiver is stored in <code>ShareStream</code> under <code>TaskId</code>. A share arriving on that channel maps unambiguously to its <code>(SourceId, JobTemplate, ThreadId)</code>—dropping the receiver on <code>ReplaceJob</code> / <code>ClearJobs</code> automatically discards stale shares.</li>
+              <li style="margin-bottom:8px"><strong>FIFO startup enumeration gate:</strong> <code>Backplane</code> waits for <code>InitialEnumerationComplete</code> from <em>every</em> transport before sending <code>ThreadRegistration::InitialEnumerationComplete</code> on the same FIFO channel after all initial threads. <code>Scheduler</code>'s <code>StartupGate</code> holds the first <code>UpdateHashRate</code> broadcast until all starting threads declare <code>ExpectedHashRate</code> (or 10 s timeout).</li>
+              <li style="margin-bottom:8px"><strong>Three-layer share filtering:</strong> Chip <code>TicketMask</code> (~1 share/s) → <code>HashTask.share_target</code> clamped between <code>MEASUREMENT_SHARE_RATE</code> (1/s) and <code>FLOOD_CAP_RATE</code> (10/s) for accurate 5-minute <code>HashrateEstimator</code> samples → <code>JobTemplate.share_target</code> for pool submission.</li>
+              <li style="margin-bottom:8px"><strong>Device-scoped hotplug isolation:</strong> <code>Backplane</code> keys boards by <code>DeviceKey</code>; unplugging an unrelated USB device is a no-op, unplugging a board stops only that board, and re-attaching on the same key stops the replaced board first.</li>
+              <li style="margin-bottom:8px"><strong>Boards outlive one-shot transports:</strong> Even after CPU transport drops its sender, <code>Backplane::run</code> awaits <code>shutdown.cancelled()</code> before calling <code>shutdown_all_boards()</code>.</li>
+              <li><strong>Lazy BM13xx chip bring-up &amp; drop-driven cleanup:</strong> <code>BM13xxThread</code> starts held in reset and brings up the chain on first work assignment; dropping a board's <code>watch::Sender&lt;BoardTelemetry&gt;</code> causes <code>api::BoardRegistry</code> to prune it lazily.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- MUJINA 04 -->
+      <section id="muj-features">
+        <h2><span class="num">04</span> Subsystem Relationships (7 Daemon Areas)</h2>
+        <p class="section-desc">
+          Each major subsystem of <code>mujina-miner</code> arranged left-to-right from <strong>External / Coordinator</strong> through <strong>Channels &amp; Traits</strong> to <strong>Actors, Drivers &amp; Hardware</strong>.
+        </p>
+
+        <div class="tabs" data-tabgroup="muj-features">
+          <button class="tab active" data-target="muj-feat-daemon" type="button">1. Daemon &amp; Channels</button>
+          <button class="tab" data-target="muj-feat-backplane" type="button">2. Backplane &amp; Hotplug</button>
+          <button class="tab" data-target="muj-feat-scheduler" type="button">3. Scheduler &amp; Filtering</button>
+          <button class="tab" data-target="muj-feat-stratum" type="button">4. Stratum v1 &amp; Sources</button>
+          <button class="tab" data-target="muj-feat-bm13xx" type="button">5. BM13xx Actor &amp; Chain</button>
+          <button class="tab" data-target="muj-feat-boards" type="button">6. Boards, RHAP &amp; Peripherals</button>
+          <button class="tab" data-target="muj-feat-api" type="button">7. API v0 &amp; Clients</button>
+        </div>
+
+        <!-- MUJ 4.1 -->
+        <div class="panel active" id="muj-feat-daemon">
+          <div class="panel-head">
+            <h3>1. Daemon Composition Root &amp; Inter-Subsystem Channel Topology</h3>
+            <p><code>Daemon::run()</code> wires all bounded <code>mpsc</code> and <code>watch</code> channels once, then awaits <code>SIGINT</code>/<code>SIGTERM</code>.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Root["Composition &amp; Signals"]
+    DMN["Daemon::run()&lt;br/&gt;CancellationToken + TaskTracker"]
+    SIG["SIGINT / SIGTERM"]
+  end
+
+  subgraph Trans["Transports"]
+    USB["UsbTransport"]
+    CPU["CPU Virtual Transport"]
+  end
+
+  subgraph Core["Core Subsystems (Zero Direct Calls)"]
+    BP["Backplane"]
+    SRC["Job Source&lt;br/&gt;(StratumV1 / ForcedRate / Dummy)"]
+    SCH["Scheduler"]
+    API["api::serve (Axum :7785)"]
+  end
+
+  SIG --> DMN
+  DMN -. spawns &amp; cancels .-> BP
+  DMN -. spawns &amp; cancels .-> SRC
+  DMN -. spawns &amp; cancels .-> SCH
+  DMN -. spawns &amp; cancels .-> API
+  USB -- "mpsc&amp;lt;TransportEvent&amp;gt;" --> BP
+  CPU -- "mpsc&amp;lt;TransportEvent&amp;gt;" --> BP
+  BP -- "mpsc&amp;lt;ThreadRegistration&amp;gt;" --> SCH
+  BP -- "mpsc&amp;lt;BoardRegistration&amp;gt;" --> API
+  SRC -- "mpsc&amp;lt;SourceEvent&amp;gt;" --> SCH
+  SCH -- "mpsc&amp;lt;SourceCommand&amp;gt;" --> SRC
+  SCH -- "watch&amp;lt;MinerTelemetry&amp;gt;" --> API
+  API -- "mpsc&amp;lt;SchedulerCommand&amp;gt;" --> SCH
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Clean isolation:</strong>
+            <ul>
+              <li>Neither <code>Backplane</code> nor <code>Scheduler</code> imports or knows about <code>axum</code> or HTTP; they only send on channel endpoints provided by <code>Daemon::run()</code>.</li>
+              <li><code>self.tracker.close()</code> is called immediately after spawning all root tasks so <code>tracker.wait().await</code> guarantees every subsystem exits cleanly before process return.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.2 -->
+        <div class="panel" id="muj-feat-backplane">
+          <div class="panel-head">
+            <h3>2. Backplane, Inventory Discovery &amp; Board Lifecycle</h3>
+            <p>USB and virtual devices match compile-time descriptors, produce a <code>BackplaneConnector</code>, and register into Scheduler + API.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Disc["Transport Streams"]
+    USB["UsbTransport&lt;br/&gt;Device::Usb(UsbDeviceInfo)"]
+    CPUT["CPU Event&lt;br/&gt;Device::Cpu(CpuDeviceInfo)"]
+  end
+
+  subgraph BP["Backplane (backplane.rs)"]
+    SM["StreamMap&amp;lt;TransportEvent&amp;gt;"]
+    REG["BoardRegistry (inventory)&lt;br/&gt;max specificity BoardPattern"]
+    VREG["VirtualBoardRegistry&lt;br/&gt;(cpu_miner)"]
+    MAP["boards: HashMap&amp;lt;DeviceKey, ActiveBoard&amp;gt;&lt;br/&gt;(BoardInfo + shutdown BoxFuture)"]
+  end
+
+  subgraph Out["Connector Outputs"]
+    CONN["BackplaneConnector&lt;br/&gt;(info, threads, telemetry_rx, shutdown)"]
+    SCH["Scheduler&lt;br/&gt;(ThreadRegistration)"]
+    API["API Server&lt;br/&gt;(BoardRegistration)"]
+  end
+
+  USB --> SM
+  CPUT --> SM
+  SM --> REG
+  SM --> VREG
+  REG --> CONN
+  VREG --> CONN
+  CONN --> MAP
+  CONN -- "Vec&amp;lt;Box&amp;lt;dyn HashThread&amp;gt;&amp;gt;" --> SCH
+  CONN -- "watch::Receiver&amp;lt;BoardTelemetry&amp;gt;" --> API
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Discovery &amp; lifecycle rules:</strong>
+            <ul>
+              <li><code>BoardRegistry::find_descriptor()</code> scans <code>inventory::iter::&lt;BoardDescriptor&gt;()</code> and selects the highest <code>BoardPattern::specificity()</code> match.</li>
+              <li><code>InitialEnumerationComplete</code> is forwarded to <code>Scheduler</code> only after every configured transport stream emits its completion marker.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.3 -->
+        <div class="panel" id="muj-feat-scheduler">
+          <div class="panel-head">
+            <h3>3. Scheduler Hub, SlotMaps &amp; Three-Layer Share Filtering</h3>
+            <p>Central work router decoupling pool difficulty from per-thread hashrate measurement.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph In["Inputs"]
+    SEV["SourceEventStream&lt;br/&gt;UpdateJob / ReplaceJob / ClearJobs"]
+    TEV["ThreadEventStream&lt;br/&gt;ExpectedHashRate / Status / Depletion"]
+    CMD["mpsc&amp;lt;SchedulerCommand&amp;gt;&lt;br/&gt;PauseMining / ResumeMining"]
+  end
+
+  subgraph Hub["Scheduler (scheduler.rs)"]
+    GATE["StartupGate&lt;br/&gt;(waits enum + expected rates, 10s cap)"]
+    SLOTS["SlotMaps&lt;br/&gt;sources / threads / tasks"]
+    CLAMP["compute_scheduler_target()&lt;br/&gt;Layer 2: clamp 1..10 shares/s"]
+    EST["HashrateEstimator (5m window)&lt;br/&gt;+ DebouncedAlarm"]
+    FILT["Layer 3 Filter&lt;br/&gt;hash ≤ template.share_target"]
+  end
+
+  subgraph Out["Workers &amp; Sinks"]
+    HT["Box&amp;lt;dyn HashThread&amp;gt;&lt;br/&gt;Layer 1: Chip TicketMask"]
+    SHARES["ShareStream&amp;lt;TaskId&amp;gt;&lt;br/&gt;(per-task mpsc::Receiver&amp;lt;Share&amp;gt;)"]
+    SCMD["SourceCommand&lt;br/&gt;SubmitShare / UpdateHashRate"]
+    TEL["watch&amp;lt;MinerTelemetry&amp;gt;"]
+  end
+
+  SEV --> SLOTS
+  TEV --> GATE
+  CMD --> SLOTS
+  GATE --> SCMD
+  SLOTS --> CLAMP
+  CLAMP -- "HashTask + share_tx" --> HT
+  HT -- "Share" --> SHARES
+  SHARES --> EST
+  SHARES --> FILT
+  FILT -- "pool-worthy only" --> SCMD
+  EST --> TEL
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Borrow-friendly Rust design:</strong>
+            <ul>
+              <li><code>SourceEventStream</code>, <code>ThreadEventStream</code>, and <code>ShareStream</code> live as locals in <code>run()</code> rather than fields on <code>Scheduler</code> so <code>tokio::select!</code> can borrow them independently without fighting <code>&amp;mut self</code>.</li>
+              <li><code>UpdateJob</code> keeps previous tasks in <code>ShareStream</code> so late valid shares still submit; <code>ReplaceJob</code> and <code>ClearJobs</code> remove old tasks and drop their receivers immediately.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.4 -->
+        <div class="panel" id="muj-feat-stratum">
+          <div class="panel-head">
+            <h3>4. Stratum v1 Client, Job Source Supervisor &amp; Test Wrappers</h3>
+            <p>Separates wire JSON-RPC (<code>stratum_v1</code>) from reconnection policy, liveness watchdog, and template conversion (<code>job_source</code>).</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Sched["Scheduler Boundary"]
+    SE["SourceEvent / SourceCommand"]
+  end
+
+  subgraph Source["Job Sources (src/job_source)"]
+    FR["ForcedRateSource (optional wrapper)"]
+    SV1S["StratumV1Source&lt;br/&gt;ExponentialBackoff (1..60s jitter)&lt;br/&gt;MAX_JOB_GAP (2m) · suggest_diff deadband"]
+    DUM["DummySource (30s offline jobs)"]
+    TPL["JobTemplate / ExtranonceRange /&lt;br/&gt;MerkleRootTemplate / VersionTemplate"]
+  end
+
+  subgraph Proto["Stratum v1 Protocol (src/stratum_v1)"]
+    CLI["StratumV1Client&lt;br/&gt;(subscribe, configure, authorize,&lt;br/&gt;inline interleaved notify handling)"]
+    CONN["Connection + JsonRpcMessage"]
+    TCP["Connector trait → TcpConnector"]
+  end
+
+  SE &lt;--&gt; FR
+  FR &lt;--&gt; SV1S
+  SE &lt;--&gt; SV1S
+  SE &lt;--&gt; DUM
+  SV1S --> TPL
+  SV1S -- "ClientCommand / ClientEvent" --&gt; CLI
+  CLI --> CONN
+  CONN --> TCP
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Pool resilience guarantees:</strong>
+            <ul>
+              <li><code>StratumV1Source</code> resets reconnect backoff only if a connection stayed alive ≥ 60 s (<code>STABLE_CONNECTION_THRESHOLD</code>), preventing tight loops on flapping pools.</li>
+              <li><code>suggest_difficulty</code> targets 20 shares/min (3 s interval) with asymmetric deadband (<code>DOWN_FACTOR = 1.25</code>, <code>UP_FACTOR = 1.5</code>) and a 5 s cooldown.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.5 -->
+        <div class="panel" id="muj-feat-bm13xx">
+          <div class="panel-head">
+            <h3>5. BM13xx ASIC HashThread Actor, Reader &amp; Chain Model</h3>
+            <p>Splits handle, async actor loop, dedicated serial reader, register request-response client, and chain/domain topology.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Handle["Scheduler Handle"]
+    TH["BM13xxThread (impl HashThread)&lt;br/&gt;command_tx + event_rx + Arc&amp;lt;RwLock&amp;lt;Status&amp;gt;&amp;gt;"]
+  end
+
+  subgraph Actor["BM13xx Actor &amp; Model (src/asic/bm13xx)"]
+    ACT["Actor::run()&lt;br/&gt;lazy chip init · job rolling · share verify"]
+    CHAIN["Chain (from TopologySpec)&lt;br/&gt;Vec&amp;lt;Chip&amp;gt; + Vec&amp;lt;Domain&amp;gt; + addresses"]
+    REG["RegisterClient&lt;br/&gt;(async reg read/write matching)"]
+    RDR["Reader task&lt;br/&gt;demuxes NonceResponse vs RegisterResponse"]
+  end
+
+  subgraph Wire["Codec &amp; Board Peripherals"]
+    CODEC["codec.rs + command.rs + crc.rs&lt;br/&gt;(FramedRead / ChipCommandSink)"]
+    PER["BoardPeripherals&lt;br/&gt;(ResetLine, VoltageRegulator)"]
+  end
+
+  TH -- "ThreadCommand (+ oneshot)" --> ACT
+  ACT -- "HashThreadEvent / Share" --> TH
+  ACT --> CHAIN
+  ACT --> REG
+  ACT --> PER
+  ACT --> CODEC
+  REG --> CODEC
+  CODEC --> RDR
+  RDR -- "NonceResponse / RegisterResponse" --> ACT
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Why ASICs bypass <code>hw_trait</code>:</strong>
+            <ul>
+              <li>BM13xx chips speak chip-specific framed serial bytes directly over <code>Stream</code> / <code>ChipCommandSink</code>; the reusable boundary is <code>HashThread</code> above the actor, not a generic bus trait below it.</li>
+              <li><code>Reader</code> runs as a dedicated subtask demultiplexing unsolicited <code>NonceResponse</code> frames from solicited <code>RegisterResponse</code> frames so register probes never block nonce reception.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.6 -->
+        <div class="panel" id="muj-feat-boards">
+          <div class="panel-head">
+            <h3>6. Board Compositions, Management Protocol &amp; Peripheral Stack</h3>
+            <p>Each board composes MCU control, <code>hw_trait</code> adapters, chip-agnostic peripherals, and a board telemetry loop.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Boards["Concrete Boards (src/board)"]
+    BIT["Bitaxe Gamma&lt;br/&gt;(1× BM1370 · bitaxe-raw V0 / RHAP-D V1)"]
+    EMB["emberOne/00&lt;br/&gt;(12× BM1362 · emberone-usbserial-fw)"]
+    CPUB["CpuBoard&lt;br/&gt;(N× CpuHashThread · software SHA-256)"]
+  end
+
+  subgraph Periph["Reusable Peripherals (src/peripheral)"]
+    TPS["Tps546 / Tps546Regulator (PMBus)"]
+    EMC["Emc2101 (fan + diode temp)"]
+    TMP["Tmp1075 &amp; Tmp451 (temp sensors)"]
+    LED["StatusLed + CalibratedLed (SK6812)"]
+  end
+
+  subgraph Traits["hw_trait Layer"]
+    HWT["I2c · Gpio · Adc · RgbLed"]
+  end
+
+  subgraph Mgmt["Management Protocol (src/mgmt_protocol)"]
+    CTL["ControlChannel (bitaxe_raw)&lt;br/&gt;BitaxeRawI2c / Gpio / Led"]
+    SER["Control Serial Port (115200)"]
+  end
+
+  BIT --> TPS
+  BIT --> EMC
+  EMB --> TMP
+  EMB --> LED
+  TPS --> HWT
+  EMC --> HWT
+  TMP --> HWT
+  LED --> HWT
+  CTL -. implements .-> HWT
+  CTL --> SER
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>Composition highlights:</strong>
+            <ul>
+              <li><strong>Bitaxe Gamma</strong> opens 2 USB serial ports (control + ASIC data), runs <code>Emc2101</code> + <code>Tps546</code> over <code>BitaxeRawI2c</code>, spawns <code>BitaxeMonitor</code> updating <code>watch::Sender&lt;BoardTelemetry&gt;</code>, and returns 1 <code>BM13xxThread</code>.</li>
+              <li><strong>emberOne/00</strong> enables <code>VDDIO_EN</code> via <code>BitaxeRawGpio</code>, initializes <code>Tmp1075</code> + <code>Tmp451</code> + <code>StatusLed</code> (calibrated SK6812), and monitors temperatures asynchronously.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MUJ 4.7 -->
+        <div class="panel" id="muj-feat-api">
+          <div class="panel-head">
+            <h3>7. HTTP API v0, OpenAPI/Swagger, Telemetry &amp; External Clients</h3>
+            <p><code>axum</code> server merges scheduler and board watch streams without locks on the hot path and routes mutations through command channels.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+flowchart LR
+  subgraph Clients["External Clients"]
+    CLI["mujina-cli&lt;br/&gt;(status · raw api)"]
+    TUI["mujina-tui (planned)"]
+    HTTP["HTTP / Swagger UI Clients"]
+  end
+
+  subgraph Server["Axum Server (src/api)"]
+    RTR["OpenApiRouter (/api/v0)&lt;br/&gt;+ SwaggerUi (/swagger-ui)"]
+    SS["SharedState&lt;br/&gt;miner_telemetry() merges watches"]
+    BREG["api::BoardRegistry&lt;br/&gt;(Arc&amp;lt;Mutex&amp;gt; · lazy drop prune)"]
+    DRAIN["board_reg_rx drain task"]
+  end
+
+  subgraph Channels["Daemon Channels"]
+    MTEL["watch::Receiver&amp;lt;MinerTelemetry&amp;gt;&lt;br/&gt;(from Scheduler)"]
+    BTEL["mpsc&amp;lt;BoardRegistration&amp;gt;&lt;br/&gt;(from Backplane)"]
+    SCMD["mpsc&amp;lt;SchedulerCommand&amp;gt;&lt;br/&gt;(Pause/Resume + oneshot 5s timeout)"]
+  end
+
+  CLI --> RTR
+  TUI --> RTR
+  HTTP --> RTR
+  RTR --> SS
+  SS --> MTEL
+  SS --> BREG
+  DRAIN --> BREG
+  BTEL --> DRAIN
+  RTR -- "PATCH /api/v0/miner" --> SCMD
+            </div>
+          </div>
+          <div class="panel-notes">
+            <strong>API design notes:</strong>
+            <ul>
+              <li><code>api_client::types</code> (<code>MinerTelemetry</code>, <code>BoardTelemetry</code>, <code>SourceTelemetry</code>, <code>MinerPatchRequest</code>) is shared between server OpenAPI schemas (<code>utoipa::ToSchema</code>) and <code>mujina-cli</code>.</li>
+              <li><code>BoardCommand::SetFanTarget</code> is defined alongside <code>SchedulerCommand</code> for per-board command channels as board control endpoints expand.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- MUJINA 05 -->
+      <section id="muj-sequences">
+        <h2><span class="num">05</span> Concurrency, Hotplug &amp; Shutdown Sequences</h2>
+        <p class="section-desc">
+          Async message sequences across Tokio tasks, bounded channels, and cancellation tokens.
+        </p>
+
+        <div class="tabs" data-tabgroup="muj-sequences">
+          <button class="tab active" data-target="muj-seq-startup" type="button">Startup Gate &amp; First Job</button>
+          <button class="tab" data-target="muj-seq-share" type="button">Job &amp; Three-Layer Share Path</button>
+          <button class="tab" data-target="muj-seq-hotplug" type="button">USB Hotplug &amp; Replacement</button>
+          <button class="tab" data-target="muj-seq-shutdown" type="button">Graceful SIGINT Shutdown</button>
+        </div>
+
+        <div class="panel active" id="muj-seq-startup">
+          <div class="panel-head">
+            <h3>Startup Enumeration Gate &amp; First Hashrate Broadcast</h3>
+            <p>Prevents sending a premature zero/partial hashrate suggestion to the pool before initial boards finish enumerating.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+sequenceDiagram
+  participant Trans as UsbTransport / CPU
+  participant BP as Backplane
+  participant SCH as Scheduler (StartupGate)
+  participant HT as HashThread (BM13xx / CPU)
+  participant SRC as StratumV1Source
+
+  Trans-&gt;&gt;BP: TransportEvent::Connected(device)
+  BP-&gt;&gt;BP: match inventory BoardDescriptor → create_fn()
+  BP-&gt;&gt;SCH: ThreadRegistration::Thread(Box&lt;dyn HashThread&gt;)
+  SCH-&gt;&gt;HT: configure() + take_event_receiver()
+  Trans-&gt;&gt;BP: TransportEvent::InitialEnumerationComplete (all transports)
+  BP-&gt;&gt;SCH: ThreadRegistration::InitialEnumerationComplete (FIFO after threads)
+  Note over SCH: Arms 10s STARTUP_GATE_TIMEOUT fallback
+  HT--&gt;&gt;SCH: HashThreadEvent::ExpectedHashRate(rate)
+  Note over SCH: All initial threads reported → StartupGate opens
+  SCH-&gt;&gt;SRC: SourceCommand::UpdateHashRate(aggregate_expected)
+  SRC--&gt;&gt;SCH: SourceEvent::ReplaceJob(JobTemplate)
+  SCH-&gt;&gt;HT: replace_task(HashTask) → lazy ASIC bring-up &amp; hashing starts
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="muj-seq-share">
+          <div class="panel-head">
+            <h3>Job Dispatch &amp; Three-Layer Share Filtering</h3>
+            <p>Shows per-task <code>share_tx</code> channel attribution and separation between measurement shares and pool submissions.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+sequenceDiagram
+  participant Pool as Stratum v1 Pool
+  participant SRC as StratumV1Source
+  participant SCH as Scheduler
+  participant HT as BM13xxThread::Actor
+  participant RDR as Reader / ASIC Serial
+
+  Pool-&gt;&gt;SRC: mining.notify (clean_jobs=true)
+  SRC-&gt;&gt;SCH: SourceEvent::ReplaceJob(JobTemplate)
+  SCH-&gt;&gt;SCH: drop old TaskIds from ShareStream
+  SCH-&gt;&gt;SCH: compute_scheduler_target() [clamp 1..10 shares/s]
+  SCH-&gt;&gt;HT: replace_task(HashTask { template, share_target, share_tx })
+  HT-&gt;&gt;RDR: JobFullFormat TX (chip TicketMask pre-filter)
+  RDR--&gt;&gt;HT: NonceResponse RX (Layer 1 passed)
+  HT-&gt;&gt;HT: compute double-SHA256 header hash
+  opt hash &lt;= HashTask.share_target (Layer 2 passed)
+    HT-&gt;&gt;SCH: share_tx.send(Share { expected_work, ... })
+    SCH-&gt;&gt;SCH: update HashrateEstimator (5 min window)
+    opt hash &lt;= JobTemplate.share_target (Layer 3 passed)
+      SCH-&gt;&gt;SRC: SourceCommand::SubmitShare(share)
+      SRC-&gt;&gt;Pool: mining.submit
+    end
+  end
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="muj-seq-hotplug">
+          <div class="panel-head">
+            <h3>USB Hotplug Disconnect, Unrelated Removal &amp; Same-Key Replacement</h3>
+            <p><code>Backplane</code> isolates every board under its <code>DeviceKey</code> and uses channel drops to propagate cleanup downstream.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+sequenceDiagram
+  participant USB as UsbTransport
+  participant BP as Backplane
+  participant Board as ActiveBoard (Bitaxe)
+  participant SCH as Scheduler
+  participant API as api::BoardRegistry
+
+  USB-&gt;&gt;BP: Disconnected(other_usb_key)
+  Note over BP: Not in boards map → ignored (running boards untouched)
+
+  USB-&gt;&gt;BP: Disconnected(bitaxe_key)
+  BP-&gt;&gt;BP: boards.remove(bitaxe_key)
+  BP-&gt;&gt;Board: await board.shutdown()
+  Board-&gt;&gt;Board: cancel monitor · signal thread_shutdown_tx · drop telemetry_tx
+  Board--&gt;&gt;SCH: HashThreadEvent channel closes
+  SCH-&gt;&gt;SCH: remove ThreadEntry &amp; TaskIds · broadcast_hashrate_change()
+  Note over API: Next GET /boards sees telemetry_rx.has_changed().is_err() → prunes board
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="muj-seq-shutdown">
+          <div class="panel-head">
+            <h3>Graceful Daemon Shutdown (<code>SIGINT</code> / <code>SIGTERM</code>)</h3>
+            <p>Single root <code>CancellationToken</code> + <code>TaskTracker::wait()</code> drains boards, scheduler, pools, and Axum cleanly.</p>
+          </div>
+          <div class="diagram-box">
+            <div class="mermaid" data-diagram>
+sequenceDiagram
+  participant OS as OS Signal (SIGINT/SIGTERM)
+  participant DMN as Daemon::run()
+  participant BP as Backplane
+  participant SCH as Scheduler
+  participant SRC as StratumV1Source
+  participant API as api::serve (Axum)
+
+  OS-&gt;&gt;DMN: signal received
+  DMN-&gt;&gt;DMN: self.shutdown.cancel()
+  par Structured concurrent teardown
+    DMN--&gt;&gt;BP: shutdown.cancelled() → shutdown_all_boards().await
+  and
+    DMN--&gt;&gt;SCH: shutdown.cancelled() → idle threads &amp; exit loop
+  and
+    DMN--&gt;&gt;SRC: shutdown.cancelled() → close Stratum TCP client
+  and
+    DMN--&gt;&gt;API: axum::serve().with_graceful_shutdown() drains HTTP
+  end
+  DMN-&gt;&gt;DMN: self.tracker.wait().await → all tasks joined → Exit 0
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MUJINA 06 -->
+      <section id="muj-catalog">
+        <h2><span class="num">06</span> Complete Mujina Type, Trait &amp; Actor Directory</h2>
+        <p class="section-desc">
+          Source-verified types across <code>mujina-miner/src/</code> at <code>256foundation/mujina @ e960d20</code>. Filter by area, role, scope, or keyword.
+        </p>
+
+        <div class="filters">
+          <input class="search-input" id="mujCatSearch" type="search" placeholder="Search type, trait, channel, crate module, or responsibility…">
+          <select class="select-input" id="mujCatArea">
+            <option value="all">All areas</option>
+            <option value="Daemon &amp; Lifecycle">Daemon &amp; Lifecycle</option>
+            <option value="Backplane &amp; Transport">Backplane &amp; Transport</option>
+            <option value="Scheduler &amp; Types">Scheduler &amp; Types</option>
+            <option value="Job Sources &amp; Stratum">Job Sources &amp; Stratum</option>
+            <option value="ASIC &amp; CPU Threads">ASIC &amp; CPU Threads</option>
+            <option value="Boards &amp; Peripherals">Boards &amp; Peripherals</option>
+            <option value="API &amp; Clients">API &amp; Clients</option>
+          </select>
+          <select class="select-input" id="mujCatRole">
+            <option value="all">All roles</option>
+            <option value="surface">Client / API</option>
+            <option value="task">Coordinator</option>
+            <option value="contract">Trait / Contract</option>
+            <option value="state">Actor / Source</option>
+            <option value="driver">Driver / Codec</option>
+            <option value="infra">Channel / Msg</option>
+            <option value="hw">Transport / OS</option>
+          </select>
+          <select class="select-input" id="mujCatScope">
+            <option value="all">All scopes</option>
+            <option value="daemon">Daemon</option>
+            <option value="board">Board</option>
+            <option value="thread">Thread</option>
+            <option value="source">Source</option>
+            <option value="task">Task</option>
+          </select>
+          <span class="count-pill" id="mujCatCount"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Type / Trait / Module</th><th>Area</th><th>Role</th><th>Scope</th><th>Task / Channel</th><th>Responsibility &amp; Key Relationships</th></tr>
+            </thead>
+            <tbody id="mujCatBody"></tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <strong>Mujina architectural takeaway:</strong> Strongly-typed async Rust actors glued exclusively by channels and trait seams—making multi-board hotplug, deterministic fake-transport/mock-I2C testing, and structured shutdown first-class invariants.
+        </div>
+      </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+const CATALOG = [
+  // Daemon & Lifecycle
+  {name:"minerd::main() & Daemon",area:"Daemon & Lifecycle",role:"task",scope:"daemon",ctx:"src/bin/minerd.rs · daemon.rs",desc:"Composition root: constructs all bounded mpsc/watch channels, spawns Backplane, JobSource, Scheduler, and API into a TaskTracker, and drives graceful SIGINT/SIGTERM cancellation."},
+  {name:"CancellationToken & TaskTracker",area:"Daemon & Lifecycle",role:"infra",scope:"daemon",ctx:"tokio_util",desc:"Structured concurrency root ensuring every spawned subsystem task is cancelled and awaited before process exit."},
+  {name:"config.rs & env_help.rs & tracing.rs",area:"Daemon & Lifecycle",role:"infra",scope:"daemon",ctx:"MUJINA_* env vars",desc:"Environment configuration parsing (MUJINA_POOL_URL, MUJINA_API_LISTEN, MUJINA_USB_DISABLE, MUJINA_LOG) and structured tracing setup."},
+
+  // Backplane & Transport
+  {name:"Backplane & ActiveBoard",area:"Backplane & Transport",role:"task",scope:"daemon",ctx:"src/backplane.rs (tokio task)",desc:"Multiplexes per-transport TransportEvent streams via StreamMap, maintains HashMap<DeviceKey, ActiveBoard>, routes HashThreads to Scheduler and telemetry to API, and handles hotplug/replacement teardown."},
+  {name:"BoardRegistry & VirtualBoardRegistry",area:"Backplane & Transport",role:"driver",scope:"daemon",ctx:"inventory::iter",desc:"Discovers compile-time registered BoardDescriptor and VirtualBoardDescriptor plugins, selecting the highest-specificity USB BoardPattern match."},
+  {name:"BoardDescriptor & BoardPattern",area:"Backplane & Transport",role:"contract",scope:"board",ctx:"src/board/{mod,pattern}.rs",desc:"Declarative USB match rules (VID/PID/bcdDevice/manufacturer/product/serial) plus async BoardFactoryFn returning BackplaneConnector."},
+  {name:"BackplaneConnector & BoardInfo",area:"Backplane & Transport",role:"contract",scope:"board",ctx:"src/board/mod.rs",desc:"Standard bundle returned by every board factory: BoardInfo metadata, Vec<Box<dyn HashThread>>, watch::Receiver<BoardTelemetry>, and optional shutdown BoxFuture."},
+  {name:"UsbTransport",area:"Backplane & Transport",role:"hw",scope:"daemon",ctx:"src/transport/usb.rs",desc:"Monitors Linux USB hotplug events and emits Connected(Device::Usb), Disconnected(DeviceKey::Usb), and InitialEnumerationComplete."},
+  {name:"Device / DeviceKey / TransportEvent",area:"Backplane & Transport",role:"infra",scope:"board",ctx:"src/transport/mod.rs",desc:"Transport-neutral device descriptors and stable connection keys shared across connect and disconnect events."},
+  {name:"SerialStream / SerialReader / SerialWriter",area:"Backplane & Transport",role:"hw",scope:"board",ctx:"src/transport/serial.rs",desc:"Async serial framing/I/O abstraction and statistics wrapper over tokio_serial."},
+
+  // Scheduler & Types
+  {name:"scheduler::task() & Scheduler",area:"Scheduler & Types",role:"task",scope:"daemon",ctx:"src/scheduler.rs (tokio task)",desc:"Central work router owning SlotMaps (sources, threads, tasks), StreamMaps (SourceEvent, ThreadEvent, Share), StartupGate, and 3-layer share filtering."},
+  {name:"StartupGate",area:"Scheduler & Types",role:"task",scope:"daemon",ctx:"src/scheduler.rs",desc:"Holds initial UpdateHashRate broadcast until all transports finish enumeration and starting threads declare ExpectedHashRate (capped by 10 s timeout)."},
+  {name:"ThreadRegistration & SourceRegistration",area:"Scheduler & Types",role:"infra",scope:"daemon",ctx:"mpsc channels",desc:"Registration envelopes connecting Backplane → Scheduler (threads + InitialEnumerationComplete) and Daemon → Scheduler (sources)."},
+  {name:"HashrateEstimator",area:"Scheduler & Types",role:"state",scope:"thread",ctx:"src/types/hashrate_estimator.rs",desc:"Per-thread 5-minute sliding window estimator fed by Layer-2 share expected_work samples."},
+  {name:"DebouncedAlarm",area:"Scheduler & Types",role:"state",scope:"source",ctx:"src/types/debounced_alarm.rs",desc:"Prevents flapping high-difficulty warnings when pool target exceeds expected hashrate."},
+  {name:"Difficulty / HashRate / ShareRate / Temperature / Voltage / Frequency",area:"Scheduler & Types",role:"contract",scope:"daemon",ctx:"src/types/*",desc:"Strong unit-safe domain newtypes with Bitcoin pow::Target / pow::Work conversions."},
+
+  // Job Sources & Stratum
+  {name:"StratumV1Source & ExponentialBackoff",area:"Job Sources & Stratum",role:"state",scope:"source",ctx:"src/job_source/stratum_v1.rs",desc:"Pool supervisor managing jittered 1..60 s reconnect backoff (reset after 60 s stability), 2-min MAX_JOB_GAP liveness watchdog, and asymmetric suggest_difficulty deadband."},
+  {name:"StratumV1Client & Connection",area:"Job Sources & Stratum",role:"state",scope:"source",ctx:"src/stratum_v1/{client,connection}.rs",desc:"Protocol actor executing subscribe/configure/authorize while handling interleaved Stratum notifications inline and translating JSON-RPC to ClientEvent/ClientCommand."},
+  {name:"Connector & Transport (TcpConnector)",area:"Job Sources & Stratum",role:"contract",scope:"source",ctx:"src/stratum_v1/connection.rs",desc:"Pluggable network transport seam enabling deterministic in-memory Stratum protocol tests alongside production TCP."},
+  {name:"ForcedRateSource",area:"Job Sources & Stratum",role:"state",scope:"source",ctx:"src/job_source/forced_rate.rs",desc:"Optional decorator wrapping StratumV1Source to force a target share rate during QA/testing."},
+  {name:"DummySource",area:"Job Sources & Stratum",role:"state",scope:"source",ctx:"src/job_source/dummy.rs",desc:"Offline synthetic job generator emitting fresh templates every 30 s when MUJINA_POOL_URL is unset."},
+  {name:"JobTemplate / ExtranonceRange / MerkleRootTemplate / VersionTemplate",area:"Job Sources & Stratum",role:"infra",scope:"task",ctx:"src/job_source/*",desc:"Immutable Arc-shared work definition supporting extranonce partitioning, merkle path hashing, and BIP320 version rolling."},
+  {name:"SourceHandle / SourceEvent / SourceCommand",area:"Job Sources & Stratum",role:"infra",scope:"source",ctx:"src/job_source/messages.rs",desc:"Arc-pointer-identified return-address handle and bidirectional channel message enums (UpdateJob, ReplaceJob, ClearJobs / SubmitShare, UpdateHashRate)."},
+
+  // ASIC & CPU Threads
+  {name:"HashThread (Trait)",area:"ASIC & CPU Threads",role:"contract",scope:"thread",ctx:"src/asic/hash_thread.rs",desc:"Core worker seam: configure(), update_task(), replace_task(), go_idle(), take_event_receiver(), status()—hides single chip, multi-chip chain, or CPU topology from Scheduler."},
+  {name:"HashTask / Share / HashThreadEvent / HashThreadStatus",area:"ASIC & CPU Threads",role:"infra",scope:"task",ctx:"src/asic/hash_thread.rs",desc:"Task assignment carrying per-task mpsc::Sender<Share> for implicit source attribution, plus thread status and ExpectedHashRate events."},
+  {name:"BM13xxThread & Actor",area:"ASIC & CPU Threads",role:"state",scope:"thread",ctx:"src/asic/bm13xx/thread.rs",desc:"Handle + async actor driving a BM13xx serial chain: lazily initializes silicon on first job, rolls extranonce, computes double-SHA256, and filters against HashTask.share_target."},
+  {name:"bm13xx::Reader & RegisterClient",area:"ASIC & CPU Threads",role:"state",scope:"thread",ctx:"src/asic/bm13xx/{reader,register_client}.rs",desc:"Dedicated RX demux task separating unsolicited NonceResponse frames from solicited RegisterResponse replies."},
+  {name:"bm13xx::Chain & TopologySpec & ChipConfig",area:"ASIC & CPU Threads",role:"driver",scope:"thread",ctx:"src/asic/bm13xx/{chain,topology,chip_config}.rs",desc:"Static wiring blueprint and live runtime model tracking chips, serial addresses (interval 2), voltage domains, and per-chip stats."},
+  {name:"bm13xx::codec / command / register / response / crc",area:"ASIC & CPU Threads",role:"driver",scope:"thread",ctx:"src/asic/bm13xx/*",desc:"Bitmain BM13xx wire framing (FramedRead / ChipCommandSink), JobFullFormat, TicketMask, PLL dividers, and CRC5/CRC16."},
+  {name:"CpuHashThread & CpuMinerConfig",area:"ASIC & CPU Threads",role:"state",scope:"thread",ctx:"src/cpu_miner/*",desc:"OS-thread software SHA-256 worker implementing HashThread with configurable thread count and duty-cycle throttling."},
+
+  // Boards & Peripherals
+  {name:"board::bitaxe (Bitaxe Gamma)",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/board/bitaxe.rs",desc:"Supports bitaxe-raw (V0) & RHAP-D (V1) USB boards: composes ControlChannel, Emc2101, Tps546Regulator, BitaxeMonitor telemetry task, and 1× BM13xxThread."},
+  {name:"board::emberone00 (emberOne/00)",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/board/emberone00.rs",desc:"12× BM1362 board factory: enables VDDIO_EN GPIO, initializes Tmp1075, Tmp451 (with remote offset), CalibratedLed/StatusLed (SK6812), and telemetry monitor."},
+  {name:"board::cpu (CPU Miner Virtual Board)",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/board/cpu.rs",desc:"Virtual board registered via VirtualBoardDescriptor spawning N CpuHashThreads with zero hardware peripherals."},
+  {name:"ControlChannel & bitaxe_raw (I2c / Gpio / Led)",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/mgmt_protocol/bitaxe_raw/*",desc:"Multiplexes I2C passthrough, GPIO, and RGB LED commands over the board's control serial port (V0 & V1 frame formats) implementing hw_trait::*."},
+  {name:"hw_trait::{I2c, Gpio, Adc, RgbLed}",area:"Boards & Peripherals",role:"contract",scope:"board",ctx:"src/hw_trait/*",desc:"Async hardware-abstraction traits decoupling peripheral drivers from Linux buses, management-MCU tunneling, and test mocks."},
+  {name:"Tps546 / Tps546Regulator & pmbus",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/peripheral/{tps546,pmbus,regulator}.rs",desc:"PMBus buck regulator driver providing voltage control, telemetry, and BoardPeripherals VoltageRegulator seam."},
+  {name:"Emc2101 / Tmp1075 / Tmp451 / StatusLed",area:"Boards & Peripherals",role:"driver",scope:"board",ctx:"src/peripheral/*",desc:"Reusable fan controller, I2C temperature sensors, and animated calibrated RGB LED controller drivers."},
+
+  // API & Clients
+  {name:"api::serve() & SharedState",area:"API & Clients",role:"surface",scope:"daemon",ctx:"src/api/server.rs (axum :7785)",desc:"Axum HTTP server serving /api/v0, /api/v0/openapi.json, and /swagger-ui; merges Scheduler MinerTelemetry with BoardRegistry snapshots and exits cleanly on CancellationToken."},
+  {name:"api::v0::routes()",area:"API & Clients",role:"surface",scope:"daemon",ctx:"src/api/v0.rs",desc:"OpenAPI-documented endpoints: GET /health, GET/PATCH /miner, GET /boards[/{name}], GET /sources[/{name}]."},
+  {name:"api::BoardRegistry & BoardRegistration",area:"API & Clients",role:"surface",scope:"daemon",ctx:"src/api/registry.rs",desc:"Collects board watch::Receiver<BoardTelemetry> handles via background drain task and lazily prunes boards whose sender dropped."},
+  {name:"SchedulerCommand & BoardCommand",area:"API & Clients",role:"infra",scope:"daemon",ctx:"src/api/commands.rs",desc:"Target-specific command enums carrying oneshot::Sender<Result<()>> reply channels (PauseMining, ResumeMining, SetFanTarget)."},
+  {name:"api_client::types (MinerTelemetry, BoardTelemetry, SourceTelemetry)",area:"API & Clients",role:"contract",scope:"daemon",ctx:"src/api_client/types.rs",desc:"Shared serde + utoipa::ToSchema DTO contract between minerd server, OpenAPI schema, mujina-cli, and future mujina-tui."},
+  {name:"mujina-cli & mujina-tui",area:"API & Clients",role:"surface",scope:"daemon",ctx:"src/bin/{cli,tui}.rs",desc:"External HTTP client binaries communicating with minerd over MUJINA_API_URL (default http://127.0.0.1:7785)."}
+];
+
+const ROLE_META = {surface:["Client / API","b-surface"], task:["Coordinator","b-task"], contract:["Trait / Contract","b-contract"], state:["Actor / Source","b-state"], driver:["Driver / Codec","b-driver"], infra:["Channel / Msg","b-infra"], hw:["Transport / OS","b-hw"]};
+
+const catBody = document.getElementById("mujCatBody");
+const catSearch = document.getElementById("mujCatSearch");
+const catArea = document.getElementById("mujCatArea");
+const catRole = document.getElementById("mujCatRole");
+const catScope = document.getElementById("mujCatScope");
+const catCount = document.getElementById("mujCatCount");
+
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]))}
+
+function renderCatalog(){
+  const q = catSearch.value.trim().toLowerCase();
+  const a = catArea.value;
+  const r = catRole.value;
+  const sc = catScope.value;
+  const rows = CATALOG.filter(item => {
+    if (a !== "all" && item.area !== a) return false;
+    if (r !== "all" && item.role !== r) return false;
+    if (sc !== "all" && item.scope !== sc) return false;
+    if (q && !(item.name + " " + item.area + " " + item.ctx + " " + item.desc + " " + ROLE_META[item.role][0]).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  catCount.textContent = rows.length + " / " + CATALOG.length + " shown";
+  catBody.innerHTML = rows.map(item => {
+    const [label, cls] = ROLE_META[item.role];
+    return `<tr>
+      <td><code>${esc(item.name)}</code></td>
+      <td style="white-space:nowrap;color:var(--subtle);font-size:12.5px">${esc(item.area)}</td>
+      <td><span class="badge ${cls}">${label}</span></td>
+      <td><span class="scope-pill">${esc(item.scope)}</span></td>
+      <td><code>${esc(item.ctx)}</code></td>
+      <td>${esc(item.desc)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" style="color:var(--subtle);text-align:center;padding:24px">No matching entries.</td></tr>`;
+}
+catSearch.addEventListener("input", renderCatalog);
+catArea.addEventListener("change", renderCatalog);
+catRole.addEventListener("change", renderCatalog);
+catScope.addEventListener("change", renderCatalog);
+renderCatalog();
+
+document.querySelectorAll(".mermaid[data-diagram]").forEach((el, idx) => {
+  el.dataset.src = el.textContent.trim();
+  el.dataset.id = "mmd-" + idx;
+});
+
+function mermaidConfig(){
+  const dark = document.documentElement.dataset.theme === "dark";
+  return {
+    startOnLoad: false,
+    securityLevel: "loose",
+    theme: dark ? "dark" : "base",
+    themeVariables: dark ? {
+      primaryColor: "#1e293b", primaryTextColor: "#f1f5f9", primaryBorderColor: "#475569",
+      lineColor: "#94a3b8", secondaryColor: "#0f172a", tertiaryColor: "#111827",
+      actorBkg: "#1e293b", actorBorder: "#64748b", actorTextColor: "#f1f5f9",
+      noteBkgColor: "#2a1d0f", noteBorderColor: "#f7931a", noteTextColor: "#fde68a",
+      fontFamily: "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
+    } : {
+      primaryColor: "#ffffff", primaryTextColor: "#0f172a", primaryBorderColor: "#94a3b8",
+      lineColor: "#475569", secondaryColor: "#f8fafc", tertiaryColor: "#f1f5f9",
+      actorBkg: "#ffffff", actorBorder: "#64748b", actorTextColor: "#0f172a",
+      noteBkgColor: "#fff7ed", noteBorderColor: "#f7931a", noteTextColor: "#7c2d12",
+      fontFamily: "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
+    },
+    flowchart: { htmlLabels: true, curve: "basis", padding: 14, nodeSpacing: 34, rankSpacing: 44 },
+    sequence: { mirrorActors: false, actorMargin: 40, messageMargin: 30, boxMargin: 10, useMaxWidth: true }
+  };
+}
+
+let renderSeq = 0;
+async function renderVisibleDiagrams(force){
+  if (typeof mermaid === "undefined") return;
+  mermaid.initialize(mermaidConfig());
+  const nodes = document.querySelectorAll(".panel.active .mermaid[data-diagram]");
+  const themeKey = document.documentElement.dataset.theme || "light";
+  for (const el of nodes) {
+    if (!force && el.dataset.rendered === themeKey) continue;
+    try {
+      const { svg } = await mermaid.render(el.dataset.id + "-" + (++renderSeq), el.dataset.src);
+      el.innerHTML = svg;
+      el.dataset.rendered = themeKey;
+    } catch (e) {
+      el.innerHTML = "<pre><code>" + esc(el.dataset.src) + "</code></pre>";
+    }
+  }
+}
+
+document.querySelectorAll(".tabs").forEach(group => {
+  group.addEventListener("click", e => {
+    const btn = e.target.closest(".tab");
+    if (!btn) return;
+    const targetId = btn.dataset.target;
+    group.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b === btn));
+    const sec = group.closest("section");
+    sec.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === targetId));
+    renderVisibleDiagrams(false);
+  });
+});
+
+const themeBtn = document.getElementById("themeToggle");
+function applyTheme(theme){
+  if (theme === "dark") {
+    document.documentElement.dataset.theme = "dark";
+    themeBtn.textContent = "Switch to Light Theme";
+  } else {
+    delete document.documentElement.dataset.theme;
+    themeBtn.textContent = "Switch to Dark Theme";
+  }
+  try { localStorage.setItem("mujina-model-theme", theme); } catch {}
+  renderVisibleDiagrams(true);
+}
+themeBtn.addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+try {
+  const saved = localStorage.getItem("mujina-model-theme");
+  if (saved === "dark" || (!saved && matchMedia("(prefers-color-scheme: dark)").matches)) applyTheme("dark");
+} catch {}
+
+const navLinks = [...document.querySelectorAll("#sideNav a")];
+const sections = navLinks.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+if (navLinks[0]) navLinks[0].classList.add("active");
+const obs = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) {
+      navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + entry.target.id));
+    }
+  }
+}, { rootMargin: "-15% 0px -70% 0px" });
+sections.forEach(s => obs.observe(s));
+
+window.addEventListener("load", () => renderVisibleDiagrams(true));
+</script>
+</body>
+</html>
